@@ -1,3 +1,4 @@
 catboost
 mlxtend
 missingno
+xgboost
