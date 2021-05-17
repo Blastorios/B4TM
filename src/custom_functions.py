@@ -1,60 +1,91 @@
+#!/usr/bin/python
+'''Basic Helper Functions
+Created on 13/04/2021'''
+
 import json
-from typing import (
-    Union,
-    Dict,
-    List,
-    Any,
-)
+import sys
+from typing import *
+from pathlib import Path
 
+import numpy as np
 import pandas as pd
+import sklearn as sk
+import matplotlib.pyplot as plt
 
-############################
+####################
+## JSON DATA #######
+####################
 
-def store_json(data, file_loc:str) -> None:
-    """As the name suggests:
-    Only parse JSON compatible data svp
-    """
-
-    with open(file_loc, "w") as json_file:
-        json_file.write(json.dumps(data))
-    print(f"Stored file at {file_loc}")
-
-def load_json(file_loc:str) -> Union[Dict, List]:
-    """As the name suggests
-    """
-
-    with open(file_loc, "r") as json_read:
-        content = json.loads(json_read.read())
-    return content
-
-############################
-##### Work in Progress #####
-############################
-
-def interchange(value: Any, elements: Dict):
-    """Simple Parser
-    """
+def store_json(data: Dict, path: Union[str, Path]) -> None:
+    with open(Path(path), "w") as json_upload:
+        json.dump(data, json_upload)
     
-    return elements[value]
+    return
 
-def process_df(df_vals: pd.DataFrame, 
-               df_target: Union[pd.DataFrame, str],
-               target_name: str = "", 
-               remove:List = [], num_target: bool = False) -> pd.DataFrame:
-    """An effective function to create a quick-n-dirty df"""
+def load_json(path: Union[str, Path]) -> Dict:
+    with open(Path(path), "r") as json_down:
+        data = json.load(json_down)
     
-    df = df_vals.T
+    return data
 
-    if isinstance(df_target, str) and num_target:
-        elements = {val:ii for ii, val in enumerate(df[df_target].unique())}
-        df[df_target] = df[df_target].apply(lambda x: interchange(x, elements))
+###################
+## PROCESSING #####
+###################
+
+def prep_data(raw_df: pd.DataFrame, target_columns: List, drop_first: bool = True, make_na_col: bool = True) -> pd.DataFrame:
+    """Dummify a pandas dataframe
+    """
+    dataframe_dummy = pd.get_dummies(raw_df, columns=target_columns, 
+                                        drop_first=drop_first, 
+                                        dummy_na=make_na_col)
+    return (dataframe_dummy)
+
+###################
+## EVALUATION #####
+###################
+
+def threshold_accuracy(y_pred: Union[List, np.array], 
+                        y_true: Union[List, np.array], 
+                        threshold: float = 0.5) -> float:
     
-    elif isinstance(df_target, pd.DataFrame):
-        if target_name:
-            df[target_name] = None if type(df_target[target_name].values[0]) != int or type(df_target[target_name].values[0]) != float else 0
+    if len(y_pred) != len(y_true):
+        raise ValueError(f"Cannot process unequal length of {len(y_pred)} against {len(y_true)}")
+    
+    result = 0
+    
+    for pred, true in zip(y_pred, y_true): 
+        difference = pred - true
+        if -0.5 < difference < 0.5:
+            result += 1
 
-            for instance in df_target.index:
-                df.at[instance, target_name] =\
-                df_target[df_target.index == instance][target_name].values[0]
-        else:
-            raise ValueError("Missing target name for the ")
+    return round(result/len(y_true)*100, 3)
+
+###################
+## VISUALIZATION ##
+###################
+
+def plot_pred_true_correlation(y_pred: np.array,
+                            y_true: np.array,
+                            title: str = "",
+                            figsize: Tuple[int] = (10,10)):
+    """Simple Correlation Plot"""
+    fig, ax = plt.subplots(figsize=figsize);
+
+    plottable_df = pd.DataFrame(dict(y_pred=y_pred,y_true=y_true));
+    plottable_df.plot.scatter(x="y_pred", y="y_true", ax=ax);
+
+    longest_ax = max(plottable_df.max())+(0.01*max(plottable_df.max()));
+    shortest_ax = min(plottable_df.min())+(0.01*min(plottable_df.min()));
+
+    ax.set_xlim([shortest_ax, longest_ax]);
+    ax.set_ylim([shortest_ax, longest_ax]);
+
+    ax.plot(ax.get_xlim(), ax.get_ylim(), ls="--", c=".3");
+    
+    ax.title(title)
+
+    return (fig, ax)
+
+###################
+####### END #######
+###################
